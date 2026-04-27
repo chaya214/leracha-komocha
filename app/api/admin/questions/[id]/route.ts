@@ -1,5 +1,4 @@
 // ראוט למענה על שאלות
-// ראוט למענה על שאלות
 import { NextRequest, NextResponse } from 'next/server';
 import { Question } from '@/models/Question';
 import connectDB from '@/lib/mongodb';

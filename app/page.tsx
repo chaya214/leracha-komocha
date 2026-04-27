@@ -71,9 +71,9 @@ const [questions, setQuestions] = useState<any[]>([]);
               תשובות לשאלות אקטואליות, שיעורי וידאו וגישה לכרך החדש - הלכות גזל.
             </p>
             <div className="flex flex-wrap gap-4">
-              <button className="bg-primary text-white px-10 py-4 rounded-full font-bold shadow-xl hover:scale-105 transition-transform flex items-center gap-2">
+              {/* <button className="bg-primary text-white px-10 py-4 rounded-full font-bold shadow-xl hover:scale-105 transition-transform flex items-center gap-2">
                 לחנות הספרים <ShoppingCart size={20} />
-              </button>
+              </button> */}
               <Link href="/ask">
                 <button className="bg-white border-2 border-primary text-primary px-10 py-4 rounded-full font-bold hover:bg-primary/5 transition-colors">
                   שאל את הרב

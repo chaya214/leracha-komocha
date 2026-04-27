@@ -10,51 +10,53 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  // זיהוי גלילה לשינוי עיצוב
+  // זיהוי גלילה לשינוי עיצוב - סף נמוך יותר לתגובה מהירה
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const navLinks = [
     { name: 'דף הבית', href: '/' },
-    { name: 'שו"ת הלכתי', href: '/shut' },
+    { name: 'שו"ת', href: '/shut' },
     { name: 'הלכה יומית', href: '/halacha' },
     { name: 'שיעורי וידאו', href: '/videos' },
-    { name: 'אודות הסדרה', href: '/about' },
+    { name: 'אודות', href: '/about' },
   ];
 
-  // צבע הטקסט משתנה לפי מצב הגלילה
-  // כשלא גללנו (על הרקע הבורדו) - הטקסט לבן. כשגללנו - הטקסט כהה.
-  const textColorClass = scrolled ? 'text-foreground' : 'text-white';
-  const logoSecondaryClass = scrolled ? 'text-secondary' : 'text-secondary-light opacity-90';
+  // הגדרת מחלקות עיצוב דינמיות
+  // 1. רקע: כשהוא שקוף, הוספנו גרדיאנט כהה עדין מלמעלה כדי להבליט טקסט לבן על רקע בהיר
+  const navBgClass = scrolled 
+    ? 'bg-white/95 backdrop-blur-md shadow-lg py-3' 
+    : 'bg-gradient-to-b from-black/50 to-transparent py-6';
+
+  // 2. טקסט: במצב שקוף הוספנו drop-shadow כדי למנוע "היעלמות" על רקע לבן
+  const textColorClass = scrolled 
+    ? 'text-primary' 
+    : 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]';
 
   return (
-    <nav className={`fixed w-full z-[100] transition-all duration-500 ${
-      scrolled 
-        ? 'bg-white/95 backdrop-blur-md shadow-lg py-3' 
-        : 'bg-transparent py-6'
-    }`}>
+    <nav className={`fixed w-full z-[100] transition-all duration-500 ${navBgClass}`}>
       <div className="container mx-auto px-6 flex justify-between items-center">
         
-        {/* כפתור פעולה - שאל את הרב */}
+        {/* צד שמאל: כפתורי פעולה */}
         <div className="hidden md:flex items-center gap-4">
           <Link 
             href="/ask" 
-            className={`${
+            className={`px-6 py-2.5 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-all shadow-md ${
               scrolled ? 'bg-primary text-white' : 'bg-white text-primary'
-            } px-6 py-2.5 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-all shadow-md`}
+            }`}
           >
             <MessageCircle size={18} />
             שאל את הרב
           </Link>
-          <Link href="/cart" className={`${textColorClass} p-2 hover:bg-white/10 rounded-full transition-colors`}>
+          {/* <Link href="/cart" className={`${textColorClass} p-2 hover:bg-white/10 rounded-full transition-colors`}>
             <ShoppingCart size={22} />
-          </Link>
+          </Link> */}
         </div>
 
-        {/* תפריט ניווט מרכזי (Desktop) */}
+        {/* מרכז: תפריט ניווט (Desktop) */}
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map((link) => (
             <Link 
@@ -68,21 +70,21 @@ const Navbar = () => {
           ))}
         </div>
 
-        {/* לוגו - משנה צבע לפי רקע */}
+        {/* צד ימין: לוגו */}
         <Link href="/" className="flex flex-col items-end group">
-          <span className={`text-2xl md:text-3xl font-black tracking-tighter transition-colors ${
-            scrolled ? 'text-primary' : 'text-white'
-          }`}>
+          <span className={`text-2xl md:text-3xl font-black tracking-tighter transition-colors ${textColorClass}`}>
             לרעך <span className="text-secondary">כמוך</span>
           </span>
-          <span className={`text-[10px] font-bold leading-none tracking-[0.2em] uppercase ${logoSecondaryClass}`}>
+          <span className={`text-[10px] font-bold leading-none tracking-[0.2em] uppercase transition-colors ${
+            scrolled ? 'text-secondary' : 'text-secondary-light opacity-90'
+          }`}>
             בין אדם לחברו
           </span>
         </Link>
 
-        {/* כפתור המבורגר (Mobile) */}
+        {/* המבורגר (Mobile) */}
         <button 
-          className={scrolled ? 'text-primary' : 'text-white'} 
+          className={`md:hidden p-2 ${textColorClass}`}
           onClick={() => setIsOpen(!isOpen)}
         >
           {isOpen ? <X size={32} /> : <Menu size={32} />}
@@ -93,10 +95,10 @@ const Navbar = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-full left-0 w-full bg-white shadow-2xl border-t border-gray-100 md:hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="absolute top-full left-0 w-full bg-white shadow-2xl border-t border-gray-100 md:hidden overflow-hidden"
           >
             <div className="flex flex-col p-8 gap-6">
               {navLinks.map((link) => (
