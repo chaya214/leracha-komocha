@@ -1,8 +1,8 @@
 // ראוט למענה על שאלות
+// ראוט למענה על שאלות
 import { NextRequest, NextResponse } from 'next/server';
 import { Question } from '@/models/Question';
 import connectDB from '@/lib/mongodb';
-import mongoose from 'mongoose';
 
 export async function PUT(
   req: NextRequest,
@@ -10,7 +10,7 @@ export async function PUT(
 ) {
   try {
     await connectDB();
-    const { id } = await params;
+    const { id } = await params; // חילוץ ה-id מתוך ה-Promise
     const body = await req.json();
 
     const updatedQuestion = await Question.findByIdAndUpdate(
@@ -30,11 +30,17 @@ export async function PUT(
   }
 }
 
-// הפונקציה החדשה: מחיקת שאלה
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+// הפונקציה המתוקנת: מחיקת שאלה
+export async function DELETE(
+  req: NextRequest, 
+  { params }: { params: Promise<{ id: string }> } // שינוי ל-Promise
+) {
   try {
     await connectDB();
-    await Question.findByIdAndDelete(params.id);
+    const { id } = await params; // חילוץ ה-id עם await
+    
+    await Question.findByIdAndDelete(id);
+    
     return NextResponse.json({ success: true, message: "השאלה נמחקה בהצלחה" });
   } catch (error) {
     return NextResponse.json({ error: "שגיאה במחיקת השאלה" }, { status: 500 });
