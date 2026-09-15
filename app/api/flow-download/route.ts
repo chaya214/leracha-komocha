@@ -471,16 +471,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// הגדרת הרשאות עבור Google Drive API
-const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-  },
-  scopes: ["https://www.googleapis.com/auth/drive.file"],
+// הגדרת אימות OAuth 2.0 במקום Service Account
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET
+);
+
+oauth2Client.setCredentials({
+  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
 
-const drive = google.drive({ version: "v3", auth });
+const drive = google.drive({ version: "v3", auth: oauth2Client });
 
 const FLOW_SHARE_HOSTS = new Set([
   "flow.google.com",
@@ -742,13 +743,17 @@ async function uploadToDrive(
   filename: string,
   contentType: string
 ) {
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+
+  if (!folderId) {
+    throw new Error("חסר GOOGLE_DRIVE_FOLDER_ID במשתני הסביבה.");
+  }
+
   const nodeStream = Readable.fromWeb(webStream as any);
 
   const fileMetadata = {
     name: filename,
-    parents: process.env.GOOGLE_DRIVE_FOLDER_ID
-      ? [process.env.GOOGLE_DRIVE_FOLDER_ID]
-      : [],
+    parents: [folderId.trim()],
   };
 
   const media = {
@@ -760,8 +765,6 @@ async function uploadToDrive(
     requestBody: fileMetadata,
     media: media,
     fields: "id, webViewLink",
-    supportsAllDrives: true,
-    supportsTeamDrives: true,
   });
 
   return driveResponse.data;
