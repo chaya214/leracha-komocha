@@ -760,6 +760,8 @@ async function uploadToDrive(
     requestBody: fileMetadata,
     media: media,
     fields: "id, webViewLink",
+    supportsAllDrives: true,
+    supportsTeamDrives: true,
   });
 
   return driveResponse.data;
