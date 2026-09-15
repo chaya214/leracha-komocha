@@ -328,15 +328,18 @@ export default function FlowDownloadPage() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successData, setSuccessData] = useState<{
+    driveLink: string;
+    message: string;
+  } | null>(null);
 
   const inputType = getInputType(url.trim());
 
-  async function handleDownload(
-    e: FormEvent<HTMLFormElement>
-  ) {
+  async function handleDownload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     setError("");
+    setSuccessData(null);
 
     const cleanUrl = url.trim();
 
@@ -355,114 +358,33 @@ export default function FlowDownloadPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "/api/flow-download",
-        {
-          method: "POST",
+      const response = await fetch("/api/flow-download", {
+        method: "POST",
 
-          headers: {
-            "Content-Type": "application/json",
-          },
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-          body: JSON.stringify({
-            url: cleanUrl,
-          }),
-        }
-      );
+        body: JSON.stringify({
+          url: cleanUrl,
+        }),
+      });
 
-      if (!response.ok) {
-        let message = "ההורדה נכשלה.";
+      const data = await response.json();
 
-        try {
-          const data = await response.json();
-
-          if (data?.error) {
-            message = data.error;
-          }
-        } catch {
-          // לא JSON
-        }
-
-        throw new Error(message);
+      if (!response.ok || !data.success) {
+        throw new Error(data?.error || "העברת הקובץ לדרייב נכשלה.");
       }
 
-      /*
-       * השרת מחזיר את קובץ הווידאו.
-       */
-      const blob = await response.blob();
-
-      if (!blob.size) {
-        throw new Error(
-          "השרת החזיר קובץ ריק."
-        );
-      }
-
-      /*
-       * מנסים לקבל את שם הקובץ
-       * מהשרת.
-       */
-      let filename = "flow-video.mp4";
-
-      const disposition =
-        response.headers.get(
-          "Content-Disposition"
-        );
-
-      if (disposition) {
-        const utf8Match =
-          disposition.match(
-            /filename\*=UTF-8''([^;]+)/i
-          );
-
-        const normalMatch =
-          disposition.match(
-            /filename="?([^"]+)"?/i
-          );
-
-        try {
-          if (utf8Match?.[1]) {
-            filename = decodeURIComponent(
-              utf8Match[1]
-            );
-          } else if (normalMatch?.[1]) {
-            filename = normalMatch[1];
-          }
-        } catch {
-          filename = "flow-video.mp4";
-        }
-      }
-
-      /*
-       * יוצרים הורדה מהקובץ שקיבלנו
-       * מהשרת שלנו.
-       */
-      const objectUrl =
-        URL.createObjectURL(blob);
-
-      const link =
-        document.createElement("a");
-
-      link.href = objectUrl;
-      link.download = filename;
-
-      document.body.appendChild(link);
-
-      link.click();
-
-      link.remove();
-
-      setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
-      }, 10_000);
+      setSuccessData({
+        driveLink: data.driveLink,
+        message: data.message || "הקובץ הועבר בהצלחה לגוגל דרייב!",
+      });
     } catch (err: any) {
-      console.error(
-        "Flow download error:",
-        err
-      );
+      console.error("Flow drive upload error:", err);
 
       setError(
-        err?.message ||
-          "אירעה שגיאה במהלך הורדת הסרטון."
+        err?.message || "אירעה שגיאה במהלך העברת הסרטון לדרייב."
       );
     } finally {
       setLoading(false);
@@ -472,6 +394,7 @@ export default function FlowDownloadPage() {
   function clearInput() {
     setUrl("");
     setError("");
+    setSuccessData(null);
   }
 
   return (
@@ -501,20 +424,16 @@ export default function FlowDownloadPage() {
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
-              הורדת סרטון מ־Flow
+              העברת סרטון מ־Flow לגוגל דרייב
             </h1>
 
             <p className="mt-3 text-slate-400 leading-7">
-              הדבק קישור שיתוף של Flow או קישור
-              ישיר לסרטון והורד אותו דרך האתר.
+              הדבק קישור שיתוף של Flow או קישור ישיר לסרטון והעבר אותו ישירות לחשבון גוגל דרייב שלך.
             </p>
           </div>
 
           {/* Form */}
-          <form
-            onSubmit={handleDownload}
-            className="space-y-4"
-          >
+          <form onSubmit={handleDownload} className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label
@@ -544,6 +463,7 @@ export default function FlowDownloadPage() {
                   onChange={(e) => {
                     setUrl(e.target.value);
                     setError("");
+                    setSuccessData(null);
                   }}
                   placeholder="https://flow.google.com/shared/video/..."
                   disabled={loading}
@@ -580,6 +500,40 @@ export default function FlowDownloadPage() {
               </div>
             )}
 
+            {/* Success Card */}
+            {successData && (
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center space-y-3">
+                <p className="text-emerald-300 font-medium text-sm">
+                  {successData.message}
+                </p>
+
+                {successData.driveLink && (
+                  <a
+                    href={successData.driveLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition shadow-lg"
+                  >
+                    <span>פתח את הסרטון בגוגל דרייב</span>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* Button */}
             <button
               type="submit"
@@ -598,7 +552,7 @@ export default function FlowDownloadPage() {
                   />
 
                   <span>
-                    מוריד את הסרטון...
+                    מעביר את הסרטון לגוגל דרייב...
                   </span>
                 </>
               ) : (
@@ -619,7 +573,7 @@ export default function FlowDownloadPage() {
                   </svg>
 
                   <span>
-                    הורד סרטון
+                    העבר לגוגל דרייב
                   </span>
                 </>
               )}
@@ -674,17 +628,17 @@ export default function FlowDownloadPage() {
                 </div>
 
                 <div className="text-xs text-slate-500 mt-1">
-                  דרך השרת
+                  העלאה לדרייב
                 </div>
               </div>
 
               <div>
                 <div className="text-sm font-semibold text-slate-200">
-                  3. הורד
+                  3. צפה
                 </div>
 
                 <div className="text-xs text-slate-500 mt-1">
-                  קובץ הווידאו
+                  בגוגל דרייב
                 </div>
               </div>
             </div>

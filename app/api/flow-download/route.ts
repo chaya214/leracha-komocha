@@ -464,9 +464,23 @@
 //   }
 // }
 import { NextRequest, NextResponse } from "next/server";
+import { google } from "googleapis";
+import { Readable } from "stream";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+// הגדרת הרשאות עבור Google Drive API
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+  },
+  scopes: ["https://www.googleapis.com/auth/drive.file"],
+});
+
+const drive = google.drive({ version: "v3", auth });
 
 const FLOW_SHARE_HOSTS = new Set([
   "flow.google.com",
@@ -533,9 +547,7 @@ function extractVideoUrls(html: string): string[] {
 
   const patterns = [
     /https?:\\?\/\\?\/flow-content\.google\\?\/video\\?\/[^"'<>\\\s]+/gi,
-
     /https?:\/\/flow-content\.google\/video\/[^"'<>\\\s]+/gi,
-
     /\/\/flow-content\.google\/video\/[^"'<>\\\s]+/gi,
   ];
 
@@ -638,11 +650,6 @@ async function downloadVideo(videoUrl: URL) {
     );
   }
 
-  /*
-   * אם Flow עושה redirect,
-   * נוודא שהכתובת הסופית עדיין שייכת
-   * ל-flow-content.google.
-   */
   const finalUrl = new URL(response.url);
 
   if (!isFlowVideoUrl(finalUrl)) {
@@ -682,10 +689,6 @@ async function downloadVideo(videoUrl: URL) {
 
   let totalBytes = 0;
 
-  /*
-   * מגבלת גודל תוך כדי streaming.
-   * הסרטון לא נטען כולו לזיכרון.
-   */
   const limitedStream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const reader = response.body!.getReader();
@@ -731,6 +734,37 @@ async function downloadVideo(videoUrl: URL) {
   };
 }
 
+/**
+ * פונקציית עזר להעלאת ה-Stream ישירות ל-Google Drive
+ */
+async function uploadToDrive(
+  webStream: ReadableStream<Uint8Array>,
+  filename: string,
+  contentType: string
+) {
+  const nodeStream = Readable.fromWeb(webStream as any);
+
+  const fileMetadata = {
+    name: filename,
+    parents: process.env.GOOGLE_DRIVE_FOLDER_ID
+      ? [process.env.GOOGLE_DRIVE_FOLDER_ID]
+      : [],
+  };
+
+  const media = {
+    mimeType: contentType || "video/mp4",
+    body: nodeStream,
+  };
+
+  const driveResponse = await drive.files.create({
+    requestBody: fileMetadata,
+    media: media,
+    fields: "id, webViewLink",
+  });
+
+  return driveResponse.data;
+}
+
 export async function POST(
   request: NextRequest
 ) {
@@ -772,31 +806,20 @@ export async function POST(
      */
     if (isFlowVideoUrl(input)) {
       try {
-        const result =
-          await downloadVideo(input);
+        const result = await downloadVideo(input);
 
-        return new NextResponse(
+        const driveFile = await uploadToDrive(
           result.stream,
-          {
-            status: 200,
-
-            headers: {
-              "Content-Type":
-                result.contentType,
-
-              "Content-Disposition":
-                `attachment; filename="${result.filename}"`,
-
-              "Cache-Control":
-                "no-store, no-cache, must-revalidate",
-
-              Pragma: "no-cache",
-
-              "X-Flow-Download":
-                "direct-video",
-            },
-          }
+          result.filename,
+          result.contentType
         );
+
+        return NextResponse.json({
+          success: true,
+          message: "הקובץ הועבר בהצלחה לגוגל דרייב!",
+          fileId: driveFile.id,
+          driveLink: driveFile.webViewLink,
+        });
       } catch (error: any) {
         console.error(
           "Direct Flow video error:",
@@ -807,7 +830,7 @@ export async function POST(
           {
             error:
               error?.message ||
-              "לא ניתן להוריד את הסרטון.",
+              "לא ניתן להעביר את הסרטון לדרייב.",
           },
           { status: 502 }
         );
@@ -883,28 +906,18 @@ export async function POST(
             const result =
               await downloadVideo(parsed);
 
-            return new NextResponse(
+            const driveFile = await uploadToDrive(
               result.stream,
-              {
-                status: 200,
-
-                headers: {
-                  "Content-Type":
-                    result.contentType,
-
-                  "Content-Disposition":
-                    `attachment; filename="${result.filename}"`,
-
-                  "Cache-Control":
-                    "no-store, no-cache, must-revalidate",
-
-                  Pragma: "no-cache",
-
-                  "X-Flow-Download":
-                    "shared-video",
-                },
-              }
+              result.filename,
+              result.contentType
             );
+
+            return NextResponse.json({
+              success: true,
+              message: "הקובץ הועבר בהצלחה לגוגל דרייב!",
+              fileId: driveFile.id,
+              driveLink: driveFile.webViewLink,
+            });
           } catch (error) {
             console.warn(
               "Failed video candidate:",
@@ -916,7 +929,7 @@ export async function POST(
         return NextResponse.json(
           {
             error:
-              "נמצאה כתובת וידאו, אבל ההורדה ממנה נכשלה.",
+              "נמצאה כתובת וידאו, אבל ההעלאה לדרייב נכשלה.",
           },
           { status: 502 }
         );
@@ -961,7 +974,7 @@ export async function POST(
     );
   } catch (error: any) {
     console.error(
-      "Flow download API error:",
+      "Flow drive upload API error:",
       error
     );
 
